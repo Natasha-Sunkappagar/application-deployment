@@ -1,0 +1,54 @@
+---
+- name: Deploy Java + MySQL containers
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Install Docker
+      ansible.builtin.package:
+        name: docker
+        state: present
+
+    - name: Start Docker service
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Create Docker network
+      community.docker.docker_network:
+        name: java_mysql_net
+
+    - name: Run MySQL container
+      community.docker.docker_container:
+        name: mysql_db
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpass
+          MYSQL_DATABASE: appdb
+          MYSQL_USER: appuser
+          MYSQL_PASSWORD: apppass
+        ports:
+          - "3306:3306"
+        networks:
+          - name: java_mysql_net
+
+    - name: Build Java servlet app image
+      community.docker.docker_image:
+        name: java_servlet_app
+        build:
+          path: ./appdir
+
+    - name: Run Java servlet app container
+      community.docker.docker_container:
+        name: java_app
+        image: java_servlet_app
+        ports:
+          - "8080:8080"
+        networks:
+          - name: java_mysql_net
+        env:
+          DB_HOST: mysql_db
+          DB_USER: appuser
+          DB_PASSWORD: apppass
+          DB_NAME: appdb
