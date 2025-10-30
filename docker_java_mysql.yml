@@ -1,54 +1,67 @@
 ---
-- name: Deploy Java + MySQL containers
-  hosts: all
+- name: Deploy Java + MySQL containers using Docker
+  hosts: appserver
   become: yes
-
   tasks:
-    - name: Install Docker
-      ansible.builtin.package:
+    - name: Check if Docker is installed
+      command: docker --version
+      register: docker_check
+      ignore_errors: yes
+
+    - name: Install Docker if not installed
+      yum:
         name: docker
         state: present
+      when: docker_check.rc != 0
 
-    - name: Start Docker service
-      ansible.builtin.service:
+    - name: Start and enable Docker service
+      systemd:
         name: docker
         state: started
         enabled: yes
 
-    - name: Create Docker network
-      community.docker.docker_network:
-        name: java_mysql_net
+    - name: Ensure Docker Python module is installed
+      pip:
+        name: docker
+        executable: pip3
+
+    - name: Pull MySQL image
+      community.docker.docker_image:
+        name: mysql
+        source: pull
 
     - name: Run MySQL container
       community.docker.docker_container:
         name: mysql_db
-        image: mysql:8.0
+        image: mysql
         env:
           MYSQL_ROOT_PASSWORD: rootpass
-          MYSQL_DATABASE: appdb
-          MYSQL_USER: appuser
-          MYSQL_PASSWORD: apppass
+          MYSQL_DATABASE: myappdb
         ports:
           - "3306:3306"
-        networks:
-          - name: java_mysql_net
+        state: started
+        restart_policy: always
 
-    - name: Build Java servlet app image
+    - name: Pull Java (openjdk) image
       community.docker.docker_image:
-        name: java_servlet_app
-        build:
-          path: ./appdir
+        name: openjdk
+        source: pull
 
-    - name: Run Java servlet app container
+    - name: Copy application JAR
+      copy:
+        src: appdir/myapp.jar
+        dest: /opt/myapp.jar
+
+    - name: Run Java app container
       community.docker.docker_container:
         name: java_app
-        image: java_servlet_app
+        image: openjdk
+        command: "java -jar /opt/myapp.jar"
+        volumes:
+          - /opt/myapp.jar:/opt/myapp.jar
         ports:
           - "8080:8080"
-        networks:
-          - name: java_mysql_net
-        env:
-          DB_HOST: mysql_db
-          DB_USER: appuser
-          DB_PASSWORD: apppass
-          DB_NAME: appdb
+        depends_on:
+          - mysql_db
+        state: started
+        restart_policy: always
