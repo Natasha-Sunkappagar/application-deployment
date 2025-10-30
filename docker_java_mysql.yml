@@ -1,6 +1,6 @@
 ---
 - name: Deploy Java + MySQL containers using Docker
-  hosts: appserver
+  hosts: mimosa_nodes
   become: yes
   tasks:
     - name: Check if Docker is installed
