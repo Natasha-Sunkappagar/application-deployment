@@ -13,7 +13,9 @@ public class FormServlet extends HttpServlet {
 
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
-            Connection con = DriverManager.getConnection("jdbc:mysql://mysql_container:3306/appdb", "root", "rootpass123");
+            Connection con = DriverManager.getConnection(
+                "jdbc:mysql://mysql_db:3306/appdb", "appuser", "apppass"
+            );
             PreparedStatement ps = con.prepareStatement("INSERT INTO users(name, email) VALUES(?,?)");
             ps.setString(1, name);
             ps.setString(2, email);
