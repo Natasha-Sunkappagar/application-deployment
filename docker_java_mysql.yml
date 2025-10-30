@@ -60,10 +60,12 @@
         state: started
         enabled: yes
 
-    - name: Ensure Docker Python module is installed
-      pip:
-        name: docker
-        executable: pip3
+    - name: Ensure Docker Python SDK is installed via system package
+      become: yes
+      dnf:
+        name: python3-docker
+        state: present
+
 
     - name: Pull MySQL image
       community.docker.docker_image:
