@@ -55,13 +55,11 @@
         name: python3-docker
         state: present
 
-    # Create a dedicated Docker network
     - name: Create application network
       community.docker.docker_network:
         name: app_network
         state: present
 
-    # Deploy MySQL
     - name: Run MySQL container
       community.docker.docker_container:
         name: mysql_db
@@ -78,21 +76,21 @@
         restart_policy: always
         state: started
 
-    # Optional — only if .jar exists
-    - name: Copy application JAR (if exists)
-      copy:
-        src: appdir/myapp.jar
-        dest: /opt/myapp.jar
-      ignore_errors: yes
+   
+    - name: Build Java web app image
+      community.docker.docker_image:
+        name: java_web_app_image
+        build:
+          path: "{{ playbook_dir }}"
+          dockerfile: Dockerfile
+        source: build
+        state: present
 
-    # Run Java app container
-    - name: Run Java app container
+    
+    - name: Run Java web app container
       community.docker.docker_container:
-        name: java_app
-        image: openjdk:11
-        command: "java -jar /opt/myapp.jar"
-        volumes:
-          - /opt/myapp.jar:/opt/myapp.jar
+        name: java_web_app
+        image: java_web_app_image
         ports:
           - "8080:8080"
         networks:
