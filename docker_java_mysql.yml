@@ -76,7 +76,6 @@
         restart_policy: always
         state: started
 
-<<<<<<< HEAD
     # 👇 Build your custom Tomcat image that includes servlet + index.html
     - name: Build Java web app image
       community.docker.docker_image:
@@ -86,25 +85,9 @@
           dockerfile: Dockerfile
         source: build
         state: present
-=======
-   
-    - name: Build Java web app image
-      community.docker.docker_image:
-        name: java_web_app_image
-        build:
-          path: "{{ playbook_dir }}"
-          dockerfile: Dockerfile
-        source: build
-        state: present
->>>>>>> e0aead722a463b0ab9f22f23b7535951f78a8890
 
-<<<<<<< HEAD
     # 👇 Run the Tomcat app container
     - name: Run Java web app container
-=======
-    
-    - name: Run Java web app container
->>>>>>> e0aead722a463b0ab9f22f23b7535951f78a8890
       community.docker.docker_container:
         name: java_web_app
         image: java_web_app_image
