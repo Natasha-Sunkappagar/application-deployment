@@ -69,6 +69,7 @@
       community.docker.docker_image:
         name: mysql
         source: pull
+        extra_args: --ignore-installed
 
     - name: Run MySQL container
       community.docker.docker_container:
