@@ -1,12 +1,16 @@
-FROM openjdk:11-jdk-slim
+FROM tomcat:9-jdk11-openjdk-slim
 
-WORKDIR /usr/src/app
+WORKDIR /usr/local/tomcat/webapps/ROOT
 
-COPY javaservlet.java .
+# Copy form and servlet files
 COPY index.html .
+COPY FormServlet.java .
 
-RUN javac javaservlet.java
-RUN apt-get update && apt-get install -y python3
+# Install javac for compilation
+RUN apt-get update && apt-get install -y javac
+
+# Compile the servlet
+RUN javac -cp /usr/local/tomcat/lib/servlet-api.jar:. FormServlet.java
 
 EXPOSE 8080
-CMD ["sh", "-c", "python3 -m http.server 8080"]
+CMD ["catalina.sh", "run"]
