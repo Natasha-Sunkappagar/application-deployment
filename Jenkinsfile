@@ -12,19 +12,10 @@ pipeline {
             }
         }
 
-        stage('Setup Ansible') {
-            steps {
-                sh '''
-                sudo yum install -y ansible
-                ansible-galaxy collection install community.docker
-                '''
-            }
-        }
-
         stage('Deploy Containers using Ansible') {
             steps {
                 sh '''
-                ansible-playbook -i "localhost," -c local appdir/docker_java_mysql.yml
+                ansible-playbook -i inventory.ini appdir/docker_java_mysql.yml
                 '''
             }
         }
@@ -32,10 +23,10 @@ pipeline {
 
     post {
         success {
-            echo "Deployment Successful! Java app and MySQL are running."
+            echo " Deployment Successful! Java app and MySQL are running."
         }
         failure {
-            echo "Deployment failed! Check Jenkins logs."
+            echo " Deployment failed! Check Jenkins logs."
         }
     }
 }
