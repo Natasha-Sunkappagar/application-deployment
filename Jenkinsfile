@@ -15,7 +15,7 @@ pipeline {
         stage('Deploy Containers using Ansible') {
             steps {
                 sh '''
-                ansible-playbook -i inventory.ini appdir/docker_java_mysql.yml
+                ansible-playbook -i inventory.ini docker_java_mysql.yml
                 '''
             }
         }
