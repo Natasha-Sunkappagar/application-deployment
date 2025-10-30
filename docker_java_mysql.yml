@@ -2,11 +2,13 @@
 - name: Deploy Java + MySQL containers using Docker
   hosts: mimosa_nodes
   become: yes
+
   tasks:
     - name: Check if Docker is installed
       command: docker --version
       register: docker_check
       ignore_errors: yes
+
     - name: Check if pip3 is already installed
       command: pip3 --version
       register: pip_check
@@ -14,15 +16,11 @@
       changed_when: false
 
     - name: Install pip3 for Python 3.9 if missing
-      become: yes
       when: pip_check.rc != 0
       block:
-        - name: Install python3.9 and dependencies
+        - name: Install python3.9
           dnf:
-            name:
-              - python39
-#              - python39-devel
-#              - python39-setuptools
+            name: python39
             state: present
 
         - name: Ensure pip is available for Python 3.9
@@ -40,14 +38,6 @@
             state: link
           ignore_errors: yes
 
-        - name: Display pip3 version
-          command: pip3 --version
-          register: pip_version
-          changed_when: false
-
-        - debug:
-            msg: "pip3 is installed: {{ pip_version.stdout }}"
-
     - name: Install Docker if not installed
       yum:
         name: docker
@@ -60,53 +50,57 @@
         state: started
         enabled: yes
 
-    - name: Ensure Docker Python SDK is installed via system package
-      become: yes
+    - name: Ensure Docker Python SDK is installed
       dnf:
         name: python3-docker
         state: present
 
-
-    - name: Pull MySQL image
-      community.docker.docker_image:
-        name: mysql
-        source: pull
-        tag: latest
+    # Create a dedicated Docker network
+    - name: Create application network
+      community.docker.docker_network:
+        name: app_network
         state: present
 
-
+    # Deploy MySQL
     - name: Run MySQL container
       community.docker.docker_container:
         name: mysql_db
-        image: mysql
+        image: mysql:8
         env:
           MYSQL_ROOT_PASSWORD: rootpass
           MYSQL_DATABASE: myappdb
+          MYSQL_USER: appuser
+          MYSQL_PASSWORD: apppass
         ports:
           - "3306:3306"
-        state: started
+        networks:
+          - name: app_network
         restart_policy: always
+        state: started
 
-    - name: Pull Java (openjdk) image
-      community.docker.docker_image:
-        name: openjdk
-        source: pull
-
-    - name: Copy application JAR
+    # Optional — only if .jar exists
+    - name: Copy application JAR (if exists)
       copy:
         src: appdir/myapp.jar
         dest: /opt/myapp.jar
+      ignore_errors: yes
 
+    # Run Java app container
     - name: Run Java app container
       community.docker.docker_container:
         name: java_app
-        image: openjdk
+        image: openjdk:11
         command: "java -jar /opt/myapp.jar"
         volumes:
           - /opt/myapp.jar:/opt/myapp.jar
         ports:
           - "8080:8080"
-        depends_on:
-          - mysql_db
-        state: started
+        networks:
+          - name: app_network
+        env:
+          DB_HOST: mysql_db
+          DB_NAME: myappdb
+          DB_USER: appuser
+          DB_PASS: apppass
         restart_policy: always
+        state: started
