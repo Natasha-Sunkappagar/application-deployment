@@ -7,6 +7,46 @@
       command: docker --version
       register: docker_check
       ignore_errors: yes
+    - name: Check if pip3 is already installed
+      command: pip3 --version
+      register: pip_check
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Install pip3 for Python 3.9 if missing
+      become: yes
+      when: pip_check.rc != 0
+      block:
+        - name: Install python3.9 and dependencies
+          dnf:
+            name:
+              - python39
+              - python39-devel
+              - python39-setuptools
+            state: present
+
+        - name: Ensure pip is available for Python 3.9
+          command: python3.9 -m ensurepip --upgrade
+          args:
+            creates: /usr/bin/pip3.9
+
+        - name: Upgrade pip3.9 to latest version
+          command: python3.9 -m pip install --upgrade pip
+
+        - name: Create symlink for pip3 (if missing)
+          file:
+            src: /usr/bin/pip3.9
+            dest: /usr/bin/pip3
+            state: link
+          ignore_errors: yes
+
+        - name: Display pip3 version
+          command: pip3 --version
+          register: pip_version
+          changed_when: false
+
+        - debug:
+            msg: "pip3 is installed: {{ pip_version.stdout }}"
 
     - name: Install Docker if not installed
       yum:
