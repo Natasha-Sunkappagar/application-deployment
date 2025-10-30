@@ -21,8 +21,8 @@
           dnf:
             name:
               - python39
-              - python39-devel
-              - python39-setuptools
+#              - python39-devel
+#              - python39-setuptools
             state: present
 
         - name: Ensure pip is available for Python 3.9
