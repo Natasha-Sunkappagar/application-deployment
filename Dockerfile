@@ -2,21 +2,20 @@ FROM tomcat:9-jdk11-openjdk-slim
 
 WORKDIR /usr/local/tomcat/webapps/ROOT
 
-# Copy HTML and Java servlet source files
+# Copy app files
 COPY index.html .
 COPY FormServlet.java .
+COPY WEB-INF ./WEB-INF
 
-# Install javac (Java compiler)
+# Install javac
 RUN apt-get update && apt-get install -y javac
 
-# Create proper WEB-INF/classes directory
-RUN mkdir -p WEB-INF/classes
-
-# Compile servlet into correct folder
+# Compile servlet
 RUN javac -cp /usr/local/tomcat/lib/servlet-api.jar:. -d WEB-INF/classes FormServlet.java
 
-# (Optional but recommended) Clean up .java file after compilation
+# Clean up
 RUN rm -f FormServlet.java
 
 EXPOSE 8080
 CMD ["catalina.sh", "run"]
+
