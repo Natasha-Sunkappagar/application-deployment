@@ -1,59 +1,57 @@
 pipeline {
-    agent none
+    agent {
+        docker {
+            image 'tomcat:9-jdk11-openjdk-slim'  // ✅ includes servlet-api.jar
+            args '-u root:root -p 8080:8080'     // root to allow copy, exposes 8080
+        }
+    }
+
+    environment {
+        JAVA_HOME = '/usr/lib/jvm/java-11-openjdk'
+        PATH = "$JAVA_HOME/bin:$PATH"
+    }
 
     stages {
-        stage('Build in Java container') {
-            agent {
-                docker {
-                    image 'openjdk:8-jdk-alpine'   // lightweight Java build container
-                    args '-v $WORKSPACE:/app'     // mount workspace into container
-                }
-            }
+        stage('Checkout Code') {
             steps {
-                sh '''
-                    echo "Compiling Java source..."
-                    mkdir -p appdir
-                    javac -cp /usr/share/java/servlet-api.jar:. FormServlet.java -d appdir
-                    echo "Compilation completed."
-                '''
+                git branch: 'main', url: 'https://github.com/Natasha-Sunkappagar/application-deployment.git'
             }
         }
 
-        stage('Package WAR') {
-            agent {
-                docker {
-                    image 'openjdk:8-jdk-alpine'
-                    args '-v $WORKSPACE:/app'
-                }
-            }
+        stage('Build and Package WAR') {
             steps {
                 sh '''
-                    echo "Packaging into WAR..."
+                    echo " Compiling Java source..."
                     mkdir -p build/WEB-INF/classes
-                    cp -r appdir/* build/WEB-INF/classes/
-                    mkdir -p build/WEB-INF/lib
+                    javac -cp /usr/local/tomcat/lib/servlet-api.jar:. FormServlet.java -d build/WEB-INF/classes
+
+                    echo " Creating WAR..."
+                    cp index.html build/
                     cd build && jar -cvf myapp.war *
-                    echo "WAR package created successfully."
+                    cd ..
+                    echo "WAR created successfully: build/myapp.war"
                 '''
             }
         }
 
-        stage('Deploy on Tomcat Container') {
-            agent {
-                docker {
-                    image 'tomcat:9.0-jdk8'
-                    args '-p 8080:8080'
-                }
-            }
+        stage('Deploy on Tomcat') {
             steps {
                 sh '''
-                    echo "Deploying WAR to Tomcat..."
+                    echo " Deploying WAR to Tomcat..."
                     cp build/myapp.war /usr/local/tomcat/webapps/
-                    echo "Application deployed on Tomcat container."
-                    echo "Tomcat running at http://localhost:8080/myapp"
+                    echo "Tomcat running at: http://localhost:8080/myapp"
                     sleep 10
                 '''
             }
+        }
+    }
+
+    post {
+        success {
+            echo " Build and deployment successful!"
+        }
+        failure {
+            echo " Build or deployment failed. Check logs."
         }
     }
 }
