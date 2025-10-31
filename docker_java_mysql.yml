@@ -3,7 +3,7 @@
   become: true
   tasks:
 
-    - name: Ensure Docker is installed
+    - name: Ensure Docker and Python SDK are installed
       package:
         name:
           - docker
@@ -16,8 +16,23 @@
         state: started
         enabled: yes
 
+    - name: Copy Dockerfile and app files to managed node
+      copy:
+        src: .
+        dest: /opt/app_deploy/
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Build Tomcat app image
+      community.docker.docker_image:
+        name: tomcat-custom
+        build:
+          path: /opt/app_deploy
+        source: build
+
     - name: Run MySQL container
-      docker_container:
+      community.docker.docker_container:
         name: mysql-db
         image: mysql:8
         state: started
@@ -28,12 +43,14 @@
         ports:
           - "3306:3306"
 
-    - name: Run Tomcat container
-      docker_container:
+    - name: Run Tomcat app container
+      community.docker.docker_container:
         name: tomcat-app
-        image: tomcat:9
+        image: tomcat-custom
         state: started
         restart_policy: always
         ports:
           - "8080:8080"
+        links:
+          - mysql-db:mysql
 
