@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         ANSIBLE_HOST_KEY_CHECKING = 'False'
-        JAVA_HOME = '/usr/lib/jvm/java-11-openjdk'  // adjust if needed
+        JAVA_HOME = '/usr/lib/jvm/java-11-openjdk'
         PATH = "$JAVA_HOME/bin:$PATH"
     }
 
@@ -41,23 +41,18 @@ pipeline {
             }
         }
 
-        stage('Build Java Application') {
+        stage('Build Docker Image') {
             steps {
                 sh '''
-                echo "Compiling Java application..."
-                mkdir -p appdir
-                javac -cp .:/usr/share/tomcat/lib/servlet-api.jar FormServlet.java -d appdir
-                cd appdir
-                jar cf myapp.jar *
-                cd ..
-                echo "JAR created successfully at appdir/myapp.jar"
+                echo "Building Docker image for Java + Tomcat..."
+                docker build -t myapp:latest .
                 '''
             }
         }
 
         stage('Deploy Containers using Ansible') {
             steps {
-                echo "Deploying containers..."
+                echo "Deploying containers to managed nodes..."
                 sh '''
                 ansible-playbook -i inventory.ini docker_java_mysql.yml
                 '''
@@ -70,7 +65,8 @@ pipeline {
             echo "Deployment Successful! Java app and MySQL are running."
         }
         failure {
-            echo "Deployment failed! Check Jenkins logs for details."
+            echo " Deployment failed! Check Jenkins logs for details."
         }
     }
 }
+
