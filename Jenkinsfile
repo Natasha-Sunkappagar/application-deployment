@@ -32,7 +32,7 @@ pipeline {
                     sudo yum install -y ansible
                 fi
 
-                # Ensure Python 3.9 is present (if not)
+                # Ensure Python 3.9 is present
                 if ! python3.9 --version &>/dev/null; then
                     echo "Installing Python 3.9..."
                     sudo dnf install -y python39
@@ -41,20 +41,25 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build Java Application') {
             steps {
                 sh '''
-                echo "Building Docker image for Java + Tomcat..."
-                docker build -t myapp:latest .
+                echo "Compiling Java source..."
+                mkdir -p appdir
+                javac -cp . FormServlet.java -d appdir
+                cd appdir
+                jar cf myapp.jar *
+                cd ..
+                echo "JAR created successfully at appdir/myapp.jar"
                 '''
             }
         }
 
-        stage('Deploy Containers using Ansible') {
+        stage('Deploy with Ansible') {
             steps {
-                echo "Deploying containers to managed nodes..."
+                echo "Running Ansible playbook to build and deploy containers..."
                 sh '''
-                ansible-playbook -i inventory.ini docker_java_mysql.yml
+                ansible-playbook -i inventory.ini docker_java_mysql.yml --tags "build_and_deploy"
                 '''
             }
         }
@@ -62,10 +67,10 @@ pipeline {
 
     post {
         success {
-            echo "Deployment Successful! Java app and MySQL are running."
+            echo " Deployment Successful! Containers running on managed nodes."
         }
         failure {
-            echo " Deployment failed! Check Jenkins logs for details."
+            echo " Deployment failed! Check Jenkins and Ansible logs."
         }
     }
 }

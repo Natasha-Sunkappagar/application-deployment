@@ -2,8 +2,11 @@
 - name: Deploy Java + MySQL containers using Docker
   hosts: mimosa_nodes
   become: yes
+  vars:
+    app_dir: /opt/myapp
 
   tasks:
+    # 1️⃣ Ensure Python, pip, and Docker are installed
     - name: Check if Docker is installed
       command: docker --version
       register: docker_check
@@ -55,11 +58,20 @@
         name: python3-docker
         state: present
 
+    # 2️⃣ Copy application files (from Jenkins workspace)
+    - name: Copy application source code to managed node
+      copy:
+        src: "{{ playbook_dir }}/"
+        dest: "{{ app_dir }}/"
+        mode: 0755
+
+    # 3️⃣ Create Docker network
     - name: Create application network
       community.docker.docker_network:
         name: app_network
         state: present
 
+    # 4️⃣ Run MySQL container
     - name: Run MySQL container
       community.docker.docker_container:
         name: mysql_db
@@ -76,17 +88,17 @@
         restart_policy: always
         state: started
 
-    # 👇 Build your custom Tomcat image that includes servlet + index.html
+    # 5️⃣ Build Tomcat + Java servlet image from Dockerfile
     - name: Build Java web app image
       community.docker.docker_image:
         name: java_web_app_image
         build:
-          path: "{{ playbook_dir }}"
+          path: "{{ app_dir }}"
           dockerfile: Dockerfile
         source: build
         state: present
 
-    # 👇 Run the Tomcat app container
+    # 6️⃣ Run Tomcat container
     - name: Run Java web app container
       community.docker.docker_container:
         name: java_web_app
@@ -102,3 +114,4 @@
           DB_PASS: apppass
         restart_policy: always
         state: started
+
