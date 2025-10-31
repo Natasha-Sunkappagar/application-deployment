@@ -46,7 +46,7 @@ pipeline {
                 sh '''
                 echo "Compiling Java application..."
                 mkdir -p appdir
-                javac -cp .:/usr/share/tomcat/lib/servlet-api.jar Formservlet.java -d appdir
+                javac -cp .:/usr/share/tomcat/lib/servlet-api.jar FormServlet.java -d appdir
                 cd appdir
                 jar cf myapp.jar *
                 cd ..
