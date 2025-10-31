@@ -1,47 +1,45 @@
 pipeline {
-    agent none
+    agent any
+
+    environment {
+        INVENTORY = 'inventory.ini'
+        PLAYBOOK = 'docker_java_mysql.yml'
+    }
 
     stages {
-
-        stage('Build with Maven') {
-            agent {
-                docker {
-                    image 'maven:3.8.8-eclipse-temurin-11'
-                    args '-v $WORKSPACE:/app'
-                }
+        stage('Checkout Code') {
+            steps {
+                checkout scm
             }
+        }
+
+        stage('Install Dependencies') {
             steps {
                 sh '''
-                    echo "Building WAR file using Maven..."
-                    mvn clean package -DskipTests
+                    echo "Installing Ansible and Docker SDK if not installed..."
+                    if ! command -v ansible >/dev/null 2>&1; then
+                        sudo dnf install -y ansible python3-docker
+                    fi
                 '''
             }
         }
 
-        stage('Deploy to Tomcat Container') {
-            agent {
-                docker {
-                    image 'tomcat:9.0-jdk11'
-                    args '-p 8080:8080'
-                }
-            }
+        stage('Deploy Containers on EC2 Nodes') {
             steps {
                 sh '''
-                    echo "Deploying WAR to Tomcat..."
-                    cp target/*.war /usr/local/tomcat/webapps/
-                    echo "Application deployed to Tomcat container at http://localhost:8080"
-                    sleep 15
+                    echo "Running Ansible playbook to deploy containers on managed EC2 instances..."
+                    ansible-playbook -i ${INVENTORY} ${PLAYBOOK}
                 '''
             }
         }
     }
 
     post {
-        failure {
-            echo " Build or deployment failed. Check logs."
-        }
         success {
-            echo " Application deployed successfully on Tomcat container!"
+            echo " Deployment successful — App & DB containers running on all EC2 nodes!"
+        }
+        failure {
+            echo " Deployment failed — check Jenkins or Ansible logs for details."
         }
     }
 }

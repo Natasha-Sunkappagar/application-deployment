@@ -1,117 +1,39 @@
 ---
-- name: Deploy Java + MySQL containers using Docker
-  hosts: mimosa_nodes
-  become: yes
-  vars:
-    app_dir: /opt/myapp
-
+- hosts: mimosa_nodes
+  become: true
   tasks:
-    # 1️⃣ Ensure Python, pip, and Docker are installed
-    - name: Check if Docker is installed
-      command: docker --version
-      register: docker_check
-      ignore_errors: yes
 
-    - name: Check if pip3 is already installed
-      command: pip3 --version
-      register: pip_check
-      ignore_errors: yes
-      changed_when: false
-
-    - name: Install pip3 for Python 3.9 if missing
-      when: pip_check.rc != 0
-      block:
-        - name: Install python3.9
-          dnf:
-            name: python39
-            state: present
-
-        - name: Ensure pip is available for Python 3.9
-          command: python3.9 -m ensurepip --upgrade
-          args:
-            creates: /usr/bin/pip3.9
-
-        - name: Upgrade pip3.9 to latest version
-          command: python3.9 -m pip install --upgrade pip
-
-        - name: Create symlink for pip3 (if missing)
-          file:
-            src: /usr/bin/pip3.9
-            dest: /usr/bin/pip3
-            state: link
-          ignore_errors: yes
-
-    - name: Install Docker if not installed
-      yum:
-        name: docker
+    - name: Ensure Docker is installed
+      package:
+        name:
+          - docker
+          - python3-docker
         state: present
-      when: docker_check.rc != 0
 
-    - name: Start and enable Docker service
-      systemd:
+    - name: Start and enable Docker
+      service:
         name: docker
         state: started
         enabled: yes
 
-    - name: Ensure Docker Python SDK is installed
-      dnf:
-        name: python3-docker
-        state: present
-
-    # 2️⃣ Copy application files (from Jenkins workspace)
-    - name: Copy application source code to managed node
-      copy:
-        src: "{{ playbook_dir }}/"
-        dest: "{{ app_dir }}/"
-        mode: 0755
-
-    # 3️⃣ Create Docker network
-    - name: Create application network
-      community.docker.docker_network:
-        name: app_network
-        state: present
-
-    # 4️⃣ Run MySQL container
     - name: Run MySQL container
-      community.docker.docker_container:
-        name: mysql_db
+      docker_container:
+        name: mysql-db
         image: mysql:8
+        state: started
+        restart_policy: always
         env:
           MYSQL_ROOT_PASSWORD: rootpass
-          MYSQL_DATABASE: myappdb
-          MYSQL_USER: appuser
-          MYSQL_PASSWORD: apppass
+          MYSQL_DATABASE: appdb
         ports:
           - "3306:3306"
-        networks:
-          - name: app_network
-        restart_policy: always
+
+    - name: Run Tomcat container
+      docker_container:
+        name: tomcat-app
+        image: tomcat:9
         state: started
-
-    # 5️⃣ Build Tomcat + Java servlet image from Dockerfile
-    - name: Build Java web app image
-      community.docker.docker_image:
-        name: java_web_app_image
-        build:
-          path: "{{ app_dir }}"
-          dockerfile: Dockerfile
-        source: build
-        state: present
-
-    # 6️⃣ Run Tomcat container
-    - name: Run Java web app container
-      community.docker.docker_container:
-        name: java_web_app
-        image: java_web_app_image
+        restart_policy: always
         ports:
           - "8080:8080"
-        networks:
-          - name: app_network
-        env:
-          DB_HOST: mysql_db
-          DB_NAME: myappdb
-          DB_USER: appuser
-          DB_PASS: apppass
-        restart_policy: always
-        state: started
 
