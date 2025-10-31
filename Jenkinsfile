@@ -1,76 +1,59 @@
 pipeline {
-    agent any
-
-    environment {
-        ANSIBLE_HOST_KEY_CHECKING = 'False'
-        JAVA_HOME = '/usr/lib/jvm/java-11-openjdk'
-        PATH = "$JAVA_HOME/bin:$PATH"
-    }
+    agent none
 
     stages {
-
-        stage('Cleanup Workspace') {
-            steps {
-                echo "Cleaning previous workspace..."
-                deleteDir()
+        stage('Build in Java container') {
+            agent {
+                docker {
+                    image 'openjdk:8-jdk-alpine'   // lightweight Java build container
+                    args '-v $WORKSPACE:/app'     // mount workspace into container
+                }
             }
-        }
-
-        stage('Checkout Code') {
-            steps {
-                echo "Checking out latest code..."
-                git branch: 'main', url: 'https://github.com/Natasha-Sunkappagar/application-deployment.git'
-            }
-        }
-
-        stage('Setup Environment') {
             steps {
                 sh '''
-                # Ensure Ansible is installed
-                if ! command -v ansible-playbook &> /dev/null; then
-                    echo "Installing Ansible..."
-                    sudo yum install -y ansible
-                fi
-
-                # Ensure Python 3.9 is present
-                if ! python3.9 --version &>/dev/null; then
-                    echo "Installing Python 3.9..."
-                    sudo dnf install -y python39
-                fi
+                    echo "Compiling Java source..."
+                    mkdir -p appdir
+                    javac -cp /usr/share/java/servlet-api.jar:. FormServlet.java -d appdir
+                    echo "Compilation completed."
                 '''
             }
         }
 
-        stage('Build Java Application') {
+        stage('Package WAR') {
+            agent {
+                docker {
+                    image 'openjdk:8-jdk-alpine'
+                    args '-v $WORKSPACE:/app'
+                }
+            }
             steps {
                 sh '''
-                echo "Compiling Java source..."
-                mkdir -p appdir
-                javac -cp . FormServlet.java -d appdir
-                cd appdir
-                jar cf myapp.jar *
-                cd ..
-                echo "JAR created successfully at appdir/myapp.jar"
+                    echo "Packaging into WAR..."
+                    mkdir -p build/WEB-INF/classes
+                    cp -r appdir/* build/WEB-INF/classes/
+                    mkdir -p build/WEB-INF/lib
+                    cd build && jar -cvf myapp.war *
+                    echo "WAR package created successfully."
                 '''
             }
         }
 
-        stage('Deploy with Ansible') {
+        stage('Deploy on Tomcat Container') {
+            agent {
+                docker {
+                    image 'tomcat:9.0-jdk8'
+                    args '-p 8080:8080'
+                }
+            }
             steps {
-                echo "Running Ansible playbook to build and deploy containers..."
                 sh '''
-                ansible-playbook -i inventory.ini docker_java_mysql.yml --tags "build_and_deploy"
+                    echo "Deploying WAR to Tomcat..."
+                    cp build/myapp.war /usr/local/tomcat/webapps/
+                    echo "Application deployed on Tomcat container."
+                    echo "Tomcat running at http://localhost:8080/myapp"
+                    sleep 10
                 '''
             }
-        }
-    }
-
-    post {
-        success {
-            echo " Deployment Successful! Containers running on managed nodes."
-        }
-        failure {
-            echo " Deployment failed! Check Jenkins and Ansible logs."
         }
     }
 }
