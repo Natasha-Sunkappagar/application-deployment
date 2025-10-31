@@ -1,57 +1,62 @@
 pipeline {
-    agent {
-        docker {
-            image 'tomcat:9-jdk11-openjdk-slim'  // ✅ includes servlet-api.jar
-            args '-u root:root -p 8080:8080'     // root to allow copy, exposes 8080
-        }
-    }
+    agent any
 
     environment {
-        JAVA_HOME = '/usr/lib/jvm/java-11-openjdk'
-        PATH = "$JAVA_HOME/bin:$PATH"
+        // optional environment vars
+        APP_NAME = "myapp"
+        WAR_FILE = "target/myapp.war"
+        TOMCAT_PORT = "8085"  // changed from 8080 to avoid conflict with Jenkins
     }
 
     stages {
-        stage('Checkout Code') {
+
+        stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/Natasha-Sunkappagar/application-deployment.git'
+                echo "Checking out source code..."
+                checkout scm
             }
         }
 
-        stage('Build and Package WAR') {
+        stage('Build') {
             steps {
-                sh '''
-                    echo " Compiling Java source..."
-                    mkdir -p build/WEB-INF/classes
-                    javac -cp /usr/local/tomcat/lib/servlet-api.jar:. FormServlet.java -d build/WEB-INF/classes
-
-                    echo " Creating WAR..."
-                    cp index.html build/
-                    cd build && jar -cvf myapp.war *
-                    cd ..
-                    echo "WAR created successfully: build/myapp.war"
-                '''
+                echo "Building WAR file..."
+                sh 'mvn clean package -DskipTests'
             }
         }
 
-        stage('Deploy on Tomcat') {
+        stage('Deploy to Tomcat Container') {
+            agent {
+                docker {
+                    image 'tomcat:9-jdk11-openjdk-slim'
+                    args "-p ${TOMCAT_PORT}:8080"
+                }
+            }
             steps {
+                echo "Deploying WAR file to Tomcat container..."
                 sh '''
-                    echo " Deploying WAR to Tomcat..."
-                    cp build/myapp.war /usr/local/tomcat/webapps/
-                    echo "Tomcat running at: http://localhost:8080/myapp"
-                    sleep 10
+                    # Copy WAR file to Tomcat webapps
+                    cp ${WAR_FILE} /usr/local/tomcat/webapps/${APP_NAME}.war
+
+                    echo "Starting Tomcat..."
+                    catalina.sh run &
+                    sleep 20
+
+                    echo "Application deployed successfully!"
+                    echo "Access it at: http://localhost:${TOMCAT_PORT}/${APP_NAME}"
                 '''
             }
         }
     }
 
     post {
+        always {
+            echo "Cleaning up..."
+        }
         success {
-            echo " Build and deployment successful!"
+            echo "Pipeline executed successfully!"
         }
         failure {
-            echo " Build or deployment failed. Check logs."
+            echo "Pipeline failed! Please check the console output."
         }
     }
 }
